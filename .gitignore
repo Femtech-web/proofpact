@@ -1,0 +1,9 @@
+.next/
+node_modules/
+.env*
+!.env.example
+coverage/
+dist/
+*.log
+*.tsbuildinfo
+private-notes/
