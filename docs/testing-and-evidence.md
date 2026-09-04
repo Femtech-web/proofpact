@@ -33,4 +33,4 @@
 
 For each production claim, preserve a reproducible artifact: command, test output, route/payment receipt, Miner identity, signal hash, Base transaction, deployed address, source commit, and timestamp. Public documentation must distinguish local simulation, Base Sepolia proof, and production behavior.
 
-The local suite covers retry classification, separate authorization/settlement accounting, attempt-event persistence semantics, duplicate routes, and strict Secure Delivery normalization. It does not prove a live x402 settlement or a deployed PostgreSQL migration; those require captured integration evidence.
+The local suite covers retry classification, separate authorization/settlement accounting, attempt-event persistence semantics, duplicate routes, and strict Secure Delivery normalization. The Supabase migration and application adapter were verified on 2026-09-04 by appending and reading back the labeled run `database-smoke-20260904163542`. This does not prove a live x402 settlement; that requires a separate explicitly authorized integration run.

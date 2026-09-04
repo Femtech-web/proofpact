@@ -52,7 +52,13 @@ export function createPostgresVerificationAttemptStore(databaseUrl: string): Pos
   if (url.protocol !== "postgres:" && url.protocol !== "postgresql:") {
     throw new TypeError("databaseUrl must use postgres:// or postgresql://");
   }
-  return createStore(postgres(value, { max: 5, idle_timeout: 20, connect_timeout: 10 }));
+  return createStore(postgres(value, {
+    max: 5,
+    idle_timeout: 20,
+    connect_timeout: 10,
+    prepare: false,
+    ssl: "require",
+  }));
 }
 
 export function createPostgresVerificationAttemptStoreFromSql(sql: Sql): PostgresVerificationAttemptStore {

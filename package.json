@@ -6,6 +6,9 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "verify:database": "node --conditions=react-server --env-file=.env.local --import tsx scripts/verify-database.ts",
+    "verify:live-fraud": "node --conditions=react-server --env-file=.env.local --import tsx scripts/live-fraud-verification.ts",
+    "verify:live-fraud:execute": "node --conditions=react-server --env-file=.env.local --import tsx scripts/live-fraud-verification.ts --execute",
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test tests/*.test.ts",
@@ -18,6 +21,7 @@
     "postgres": "^3.4.9",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
+    "server-only": "^0.0.1",
     "viem": "^2.55.19",
     "zod": "^4.1.11"
   },

@@ -1,5 +1,5 @@
 const BASE_SEPOLIA_NETWORK = "eip155:84532";
-const BASE_SEPOLIA_USDC = "0x036cbd53842c5426634e7929541ec2318f3dcf7e";
+export const BASE_SEPOLIA_USDC_ADDRESS = "0x036cbd53842c5426634e7929541ec2318f3dcf7e";
 const EVM_ADDRESS = /^0x[0-9a-fA-F]{40}$/;
 const DECIMAL_UNITS = /^(?:0|[1-9][0-9]*)$/;
 
@@ -53,7 +53,7 @@ function microUsdc(maxCostUsdc: number): bigint {
 function normalizeOption(value: unknown): X402PaymentOption | undefined {
   const option = requireRecord(value, "accepts[]");
   if (option.scheme !== "exact" || option.network !== BASE_SEPOLIA_NETWORK) return undefined;
-  if (typeof option.asset !== "string" || option.asset.toLowerCase() !== BASE_SEPOLIA_USDC) return undefined;
+  if (typeof option.asset !== "string" || option.asset.toLowerCase() !== BASE_SEPOLIA_USDC_ADDRESS) return undefined;
   if (typeof option.amount !== "string" || !DECIMAL_UNITS.test(option.amount) || BigInt(option.amount) === 0n) {
     throw new X402PolicyError("INVALID_CHALLENGE", "compatible payment amount must be positive decimal units");
   }

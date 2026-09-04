@@ -51,3 +51,5 @@ Unsupported or missing fields produce `INCONCLUSIVE`, never `PASS`.
 The four adapters bind their questions to the same canonical artifact commitment. `CVE_LOOKUP`, `URL_SCAN`, and `SSL_VERIFICATION` accept only explicit structured status/boolean fields. Prose, unknown labels, missing confidence, or an Intent mismatch cannot be promoted into a pass.
 
 The PostgreSQL attempt-ledger migration is [`001_verification_attempt_events.sql`](../infrastructure/persistence/migrations/001_verification_attempt_events.sql). It includes database triggers that reject updates and deletes. Applying that migration is required before composing the live verifier with `createPostgresVerificationAttemptStore`.
+
+For Supabase, apply the migration through the dashboard SQL Editor and use the transaction-pooler connection URI on port `6543` as the server-only `DATABASE_URL`. The Postgres.js adapter disables prepared statements for transaction-pooler compatibility and requires TLS. No Supabase anonymous key or service-role API key is required for this adapter.
