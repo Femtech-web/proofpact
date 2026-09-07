@@ -36,7 +36,8 @@ try {
   if (receiptId) {
     const receipt = await client.callTool({ name: "get_receipt", arguments: { receiptId } });
     if (receipt.isError || !receipt.structuredContent) throw new Error("Receipt MCP call failed");
-    if (typeof receipt.structuredContent.settlementTransactionHash !== "string") {
+    const structuredReceipt = receipt.structuredContent as Record<string, unknown>;
+    if (typeof structuredReceipt.settlementTransactionHash !== "string") {
       throw new Error("Confirmed settlement projection was not returned through MCP");
     }
     receiptCall = "passed";
