@@ -5,6 +5,8 @@ import { buildFraudQuestion, type SecureDeliveryFraudInput } from "../features/v
 import { createPostgresVerificationAttemptStore } from "../infrastructure/persistence/postgres-verification-attempt-store";
 import { createLiveFraudVerifier } from "../infrastructure/telegraph/live-fraud-verifier";
 import { BASE_SEPOLIA_USDC_ADDRESS } from "../infrastructure/x402/payment-policy";
+import { createExpiredAuthorizationReconciler } from "../infrastructure/x402/reconcile-authorized-payment";
+import { createManagedDnsFetch } from "../infrastructure/http/managed-dns-fetch";
 
 const PRIVATE_KEY = /^0x[0-9a-fA-F]{64}$/;
 const EVM_ADDRESS = /^0x[0-9a-fA-F]{40}$/;
@@ -119,7 +121,9 @@ if (process.env.PROOFPACT_CONFIRM_PAID_CALL !== "YES"
 }
 
 const store = createPostgresVerificationAttemptStore(databaseUrl);
+const managedFetch = createManagedDnsFetch(process.env.TELEGRAPH_DNS_SERVERS?.trim() || "8.8.8.8");
 try {
+  const runSignal = AbortSignal.timeout(300_000);
   const verifier = createLiveFraudVerifier({
     nodeUrl,
     baseSepoliaRpcUrl: rpcUrl,
@@ -129,6 +133,16 @@ try {
     maxAttempts,
     requiredDistinctResults: 1,
     attemptStore: store,
+    reconcileAuthorizedFailure: createExpiredAuthorizationReconciler({
+      rpcUrl,
+      payer,
+      signal: runSignal,
+    }),
+    retryDelayMs: ({ attemptNumber, paymentState }) => {
+      if (paymentState !== "NOT_AUTHORIZED") return 2_000;
+      return attemptNumber === 1 ? 10_000 : 30_000;
+    },
+    fetchImpl: managedFetch.fetch,
     authorizePayment: async (payment) => {
       const currentBalance = await publicClient.readContract({
         address: BASE_SEPOLIA_USDC_ADDRESS,
@@ -139,7 +153,7 @@ try {
       return currentBalance >= BigInt(Math.ceil(payment.amountUsdc * 1_000_000));
     },
   });
-  const result = await verifier.verify(liveInput.input, AbortSignal.timeout(180_000));
+  const result = await verifier.verify(liveInput.input, runSignal);
   console.log(JSON.stringify({
     status: result.complete ? "ROUTE_RECEIVED" : "ROUTE_INCOMPLETE",
     runId: result.runId,
@@ -157,5 +171,5 @@ try {
     })),
   }, null, 2));
 } finally {
-  await store.close();
+  await Promise.all([store.close(), managedFetch.close()]);
 }

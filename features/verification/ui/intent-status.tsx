@@ -7,6 +7,8 @@ const labels: Record<VerificationIntent, string> = {
   URL_SCAN: "Deployment safety",
   SSL_VERIFICATION: "Domain & TLS",
   FACT_CHECK: "Delivery claims",
+  WEB_SEARCH: "Repository evidence",
+  CONTENT_EXTRACTION: "Commit evidence",
   AGENT_TASK: "Task evidence",
 };
 

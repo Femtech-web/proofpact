@@ -36,6 +36,8 @@ test("builds a stable, artifact-bound fraud request", () => {
   const second = buildFraudQuestion(input);
   assert.equal(first.artifactHash, second.artifactHash);
   assert.match(first.query, /FRAUD_DETECTION/);
+  assert.match(first.query, new RegExp(input.commitSha));
+  assert.match(first.query, /api\.example\.com/);
   assert.equal((first.context as Record<string, unknown>).policy_version, "DELIVERY_V1");
 });
 
@@ -48,6 +50,7 @@ test("normalizes structured fraud evidence and records its provenance", () => {
   assert.equal(record.attemptNumber, 1);
   assert.equal(record.paymentReference, "0xpayment");
   assert.equal(record.artifactHash, request.artifactHash);
+  assert.equal(record.responseEvidence.status, "CAPTURED");
 });
 
 test("abstains on prose or ambiguous payloads instead of inventing safety", () => {
@@ -55,4 +58,18 @@ test("abstains on prose or ambiguous payloads instead of inventing safety", () =
   const record = toFraudVerificationRecord(input, request, routed("Looks mostly fine"));
   assert.equal(record.verdict, "INCONCLUSIVE");
   assert.equal(record.confidence, 0);
+});
+
+test("adapts fraud results through a declared Miner mapping", () => {
+  const request = buildFraudQuestion(input);
+  const record = toFraudVerificationRecord(
+    input,
+    request,
+    routed({ assessment: { classification: "LEGITIMATE", confidence_score: 0.88 } }),
+    1,
+    { labelField: "assessment.classification", confidenceField: "assessment.confidence_score" },
+  );
+  assert.equal(record.verdict, "PASS");
+  assert.equal(record.confidence, 0.88);
+  assert.ok(record.warnings.includes("NORMALIZATION_DECLARED_MAPPING"));
 });

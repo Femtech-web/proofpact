@@ -29,6 +29,21 @@ export type PaidFraudRunOptions = Readonly<{
   maxAuthorizedCostUsdc: number;
   attemptStore: VerificationAttemptStore;
   authorizePayment: (payment: AuthorizedPayment, attemptNumber: number) => boolean | Promise<boolean>;
+  reconcileAuthorizedFailure?: (context: Readonly<{
+    payment: AuthorizedPayment;
+    attemptNumber: number;
+    authorizedAt: string;
+    error: unknown;
+  }>) => Promise<Readonly<{
+    state: "EXPIRED_UNSETTLED" | "SETTLED" | "UNKNOWN";
+    evidence: Readonly<Record<string, string | number | boolean>>;
+  }>>;
+  retryDelayMs?: (context: Readonly<{
+    attemptNumber: number;
+    errorCode: string;
+    paymentState: "NOT_AUTHORIZED" | "EXPLICITLY_UNSETTLED";
+  }>) => number;
+  sleep?: (milliseconds: number) => Promise<void>;
   attempt: (context: PaidFraudAttempt) => Promise<FraudVerificationRecord>;
   now?: () => Date;
   createEventId?: () => string;
@@ -112,6 +127,7 @@ export async function runPaidFraudVerification(options: PaidFraudRunOptions): Pr
   if (!runId || runId.length > 128) throw new TypeError("runId is required and must be at most 128 characters");
   const now = options.now ?? (() => new Date());
   const createEventId = options.createEventId ?? randomUUID;
+  const sleep = options.sleep ?? ((milliseconds: number) => new Promise<void>((resolve) => setTimeout(resolve, milliseconds)));
   const records: FraudVerificationRecord[] = [];
   const seenIdentities = new Set<string>();
   let authorizedUnits = 0n;
@@ -131,6 +147,8 @@ export async function runPaidFraudVerification(options: PaidFraudRunOptions): Pr
   for (let attemptNumber = 1; attemptNumber <= options.maxAttempts; attemptNumber += 1) {
     attempts = attemptNumber;
     let authorizedThisAttempt = false;
+    let authorizedPayment: AuthorizedPayment | undefined;
+    let authorizedAt: string | undefined;
     await append(attemptNumber, { type: "STARTED" });
 
     const authorizePayment = async (payment: AuthorizedPayment): Promise<boolean> => {
@@ -145,12 +163,20 @@ export async function runPaidFraudVerification(options: PaidFraudRunOptions): Pr
       if (!await options.authorizePayment(payment, attemptNumber)) return false;
 
       // Persist authority before returning it to the signing boundary.
-      await append(attemptNumber, {
+      authorizedAt = now().toISOString();
+      await options.attemptStore.append({
+        eventId: createEventId(),
+        runId,
+        pactId,
+        intent: "FRAUD_DETECTION",
+        attemptNumber,
+        occurredAt: authorizedAt,
         type: "PAYMENT_AUTHORIZED",
         payment,
         cumulativeAuthorizedCostUsdc: Number(authorizedUnits + paymentUnits) / 1_000_000,
       });
       authorizedThisAttempt = true;
+      authorizedPayment = payment;
       authorizedUnits += paymentUnits;
       return true;
     };
@@ -188,8 +214,45 @@ export async function runPaidFraudVerification(options: PaidFraudRunOptions): Pr
     } catch (error) {
       const failure = classifyFailure(error, authorizedThisAttempt);
       await append(attemptNumber, { type: "FAILED", ...failure });
+      if (failure.paymentState === "AUTHORIZED_AMBIGUOUS"
+        && authorizedPayment
+        && authorizedAt
+        && options.reconcileAuthorizedFailure) {
+        let reconciliation: Awaited<ReturnType<NonNullable<PaidFraudRunOptions["reconcileAuthorizedFailure"]>>>;
+        try {
+          reconciliation = await options.reconcileAuthorizedFailure({
+            payment: authorizedPayment,
+            attemptNumber,
+            authorizedAt,
+            error,
+          });
+        } catch {
+          reconciliation = {
+            state: "UNKNOWN",
+            evidence: Object.freeze({ reason: "RECONCILIATION_FAILED" }),
+          };
+        }
+        const retryPermitted = reconciliation.state === "EXPIRED_UNSETTLED"
+          && attemptNumber < options.maxAttempts;
+        await append(attemptNumber, {
+          type: "PAYMENT_RECONCILED",
+          reconciliationState: reconciliation.state,
+          retryPermitted,
+          evidence: reconciliation.evidence,
+        });
+        if (retryPermitted) continue;
+      }
       if (!failure.retryable) throw error;
       if (attemptNumber === options.maxAttempts && records.length === 0) throw error;
+      const delayMs = options.retryDelayMs?.({
+        attemptNumber,
+        errorCode: failure.errorCode,
+        paymentState: failure.paymentState as "NOT_AUTHORIZED" | "EXPLICITLY_UNSETTLED",
+      }) ?? 0;
+      if (!Number.isSafeInteger(delayMs) || delayMs < 0 || delayMs > 60_000) {
+        throw new TypeError("retry delay must be an integer between 0 and 60000 milliseconds");
+      }
+      if (delayMs > 0) await sleep(delayMs);
     }
   }
 

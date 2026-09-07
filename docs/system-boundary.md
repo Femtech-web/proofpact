@@ -156,13 +156,12 @@ The primary interface is the web app. After the full flow is proven, MCP becomes
 
 | Product step | Current code | Current status |
 | --- | --- | --- |
-| Requester chooses a pack and describes work | [`app/app/jobs/new/page.tsx`](../app/app/jobs/new/page.tsx) and [`features/policies/domain/policy-pack.ts`](../features/policies/domain/policy-pack.ts) | UI/domain baseline; not persisted or funded yet |
+| Requester chooses a pack and describes work | [`app/app/jobs/new/page.tsx`](../app/app/jobs/new/page.tsx), [`features/policies/domain/policy-pack.ts`](../features/policies/domain/policy-pack.ts), and the pact store | Implemented; drafts persist and immutable terms are funded separately |
 | Worker performs work in GitHub/Vercel | External system | Intentionally outside ProofPact |
-| Worker submits evidence | Job/submission use case and Route Handler still to be built | Not implemented |
-| ProofPact constructs fraud verification | [`features/verification/application/fraud-verification.ts`](../features/verification/application/fraud-verification.ts) | Implemented and tested |
-| ProofPact validates/pays x402 | [`infrastructure/x402/payment-policy.ts`](../infrastructure/x402/payment-policy.ts), [`authorized-fetch.ts`](../infrastructure/x402/authorized-fetch.ts) | Implemented and protocol-response tested; not called live here |
-| Telegraph request and routed result | [`infrastructure/telegraph/engine-client.ts`](../infrastructure/telegraph/engine-client.ts) | Implemented with strict intent, cost, identity, signal, and size checks |
-| Server-only live fraud composition | [`infrastructure/telegraph/live-fraud-verifier.ts`](../infrastructure/telegraph/live-fraud-verifier.ts) | Implemented; awaits explicit environment and live test authorization |
-| Deterministic settlement decision | [`features/settlement/domain/evaluate-settlement.ts`](../features/settlement/domain/evaluate-settlement.ts) | Implemented and tested locally |
-| Base escrow release | [`infrastructure/settlement/base-settler.ts`](../infrastructure/settlement/base-settler.ts) | Interface only; contract/adapter not yet implemented |
-| Replayable receipt | Receipt route baseline plus future receipt domain | UI baseline; canonical receipt implementation remains |
+| Worker submits evidence | [`app/app/jobs/[jobId]/worker-submission-form.tsx`](../app/app/jobs/[jobId]/worker-submission-form.tsx) and signed submission domain | Implemented; only the recorded worker can submit exact artifact evidence |
+| ProofPact verifies source provenance | [`infrastructure/source/github-commit-verifier.ts`](../infrastructure/source/github-commit-verifier.ts) | Implemented, tested, and exercised against the exact public commit |
+| ProofPact validates/pays x402 | [`infrastructure/x402/payment-policy.ts`](../infrastructure/x402/payment-policy.ts), [`authorized-fetch.ts`](../infrastructure/x402/authorized-fetch.ts) | Implemented, tested, and exercised in bounded live paid runs |
+| Telegraph request and routed result | [`infrastructure/telegraph/engine-client.ts`](../infrastructure/telegraph/engine-client.ts) and [`execute-secure-delivery-verification.ts`](../infrastructure/telegraph/execute-secure-delivery-verification.ts) | Live multi-intent routing, identity capture, normalization, retry, and receipts implemented |
+| Deterministic settlement decision | [`features/settlement/domain/evaluate-settlement.ts`](../features/settlement/domain/evaluate-settlement.ts) | Implemented, tested, and proven fail-closed with live evidence |
+| Base escrow release | [`contracts/src/ProofPactEscrow.sol`](../contracts/src/ProofPactEscrow.sol) and [`infrastructure/settlement/base-settler.ts`](../infrastructure/settlement/base-settler.ts) | Deployed and tested; final live receipt-bound release remains |
+| Replayable receipt | Pact store plus [`app/app/receipts/[receiptId]/page.tsx`](../app/app/receipts/[receiptId]/page.tsx) | Immutable receipt persistence and replay UI implemented |

@@ -4,6 +4,9 @@ node_modules/
 !.env.example
 coverage/
 dist/
+contracts/cache/
+contracts/out/
+contracts/broadcast/
 *.log
 *.tsbuildinfo
 private-notes/

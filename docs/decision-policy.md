@@ -17,9 +17,10 @@ A pact stores the selected pack ID and immutable version at funding time. That v
 
 ## Secure Delivery V1 thresholds
 
-- Required intents: `FRAUD_DETECTION`, `CVE_LOOKUP`, `URL_SCAN`, `SSL_VERIFICATION`.
+- Required source proof: GitHub must bind the submitted repository, exact commit SHA, canonical permalink, and remediation claim before paid routing begins.
+- Required Telegraph intents: `FRAUD_DETECTION`, `URL_SCAN`, and `SSL_VERIFICATION`.
 - Minimum normalized confidence: `0.75`.
-- One accepted signal per unique Miner identity.
+- One accepted signal per Miner identity per intent, with at least two distinct Miner identities across the complete verification.
 - No required `FAIL` or `INCONCLUSIVE` may coexist with `RELEASE`.
 - A conclusive `FRAUD_DETECTION: FAIL` is terminal `REJECT`.
 - Another required failure yields `HOLD` when remediation is possible.

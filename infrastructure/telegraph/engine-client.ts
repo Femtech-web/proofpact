@@ -8,7 +8,15 @@ const MAX_HEADER_BYTES = 16 * 1024;
 const SIGNAL_HASH = /^0x[0-9a-fA-F]{64}$/;
 const INTENT_LABEL = /^[A-Z][A-Z0-9_]{0,63}$/;
 
-export type TelegraphIntent = "FRAUD_DETECTION" | "CVE_LOOKUP" | "URL_SCAN" | "SSL_VERIFICATION";
+export type TelegraphIntent =
+  | "FRAUD_DETECTION"
+  | "CVE_LOOKUP"
+  | "URL_SCAN"
+  | "SSL_VERIFICATION"
+  | "FACT_CHECK"
+  | "WEB_SEARCH"
+  | "CONTENT_EXTRACTION"
+  | "AGENT_TASK";
 
 export type TelegraphPaymentReceipt = Readonly<{
   headerHash: `0x${string}`;

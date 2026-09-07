@@ -53,9 +53,9 @@ export function createPostgresVerificationAttemptStore(databaseUrl: string): Pos
     throw new TypeError("databaseUrl must use postgres:// or postgresql://");
   }
   return createStore(postgres(value, {
-    max: 5,
+    max: 1,
     idle_timeout: 20,
-    connect_timeout: 10,
+    connect_timeout: 30,
     prepare: false,
     ssl: "require",
   }));

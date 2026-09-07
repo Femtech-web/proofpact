@@ -1,58 +1,77 @@
-# MCP integration plan
+# MCP integration
 
 ## Purpose
 
-MCP makes ProofPact usable as agent-economy infrastructure. Codex, Claude, ChatGPT, IDE agents, and autonomous services can commission or deliver work without automating the browser.
-
-It is not a second backend. The MCP server calls the same application use cases, repositories, policies, and authorization services as the Next.js interface.
+ProofPact's MCP server makes the proven application services available to coding agents and autonomous systems without browser automation. It is a thin adapter, not a second backend:
 
 ```text
 Web UI ─────┐
-            ├── application use cases → domain → infrastructure adapters
-MCP server ─┘
+            ├── application services → domain policy → infrastructure
+MCP stdio ──┘
 ```
 
-## Sequence
+Both paths use the same policy-pack registry, PostgreSQL pact store, funding-plan builder, requester authorization format, receipt payload, and canonical hash logic.
 
-MCP begins only after:
+## Implemented tools
 
-1. Secure Delivery works end to end.
-2. Real Telegraph x402 routes and Base Sepolia settlement are reproducibly proven.
-3. Replay receipts and failure/remediation paths pass their release tests.
+| Tool | Behavior | Side effect |
+| --- | --- | --- |
+| `list_policy_packs` | Lists versions, evidence fields, required Telegraph intents, and paid-proof status | None |
+| `create_pact_draft` | Idempotently creates an unfunded pact | Database draft only |
+| `get_pact` | Reads the latest pact, submission, receipt, and change request | None |
+| `prepare_funding` | Returns exact Base Sepolia USDC approval and escrow calldata | None; never signs or broadcasts |
+| `prepare_worker_submission` | Validates evidence and returns the exact message the recorded worker must sign | None |
+| `estimate_verification` | Discloses intents, first-pass estimate, retry limit, and `0.12 USDC` ceiling | None; never routes or pays |
+| `prepare_verification_authorization` | Returns a short-lived message binding requester, submission, artifact, intents, and cost ceiling | None; never starts verification |
+| `get_receipt` | Reads immutable decision evidence plus the confirmed settlement projection | None |
+| `replay_receipt` | Recomputes the canonical payload hash and reports whether it matches | None; never routes, pays, signs, or executes |
 
-Then:
+The MCP deliberately stops at wallet- or signature-ready outputs for financial actions. The web path verifies the corresponding signature and owns the paid orchestration. This prevents an MCP client with read access from silently acquiring spending or settlement authority.
 
-4. Add the MCP transport as a thin adapter.
-5. Demonstrate one external agent creating, monitoring, or submitting to a real pact through MCP.
+## Run locally
 
-## Initial tools
+Configure `.env.local`, including `DATABASE_URL`, `PROOFPACT_ESCROW_ADDRESS`, and optionally `PROOFPACT_APP_URL`, then run:
 
-| Tool | Behavior |
-| --- | --- |
-| `list_policy_packs` | Return active packs, versions, requirements, costs, and Miner-coverage preflight |
-| `create_pact_draft` | Validate a milestone and produce a deterministic draft; no custody mutation |
-| `prepare_funding` | Return bounded wallet-ready Base transaction data |
-| `get_pact` | Read milestone, escrow, submission, verification, and settlement state |
-| `submit_delivery` | Idempotently commit an artifact/evidence bundle |
-| `estimate_verification` | Return intents, likely call count, retry ceiling, and maximum x402 spend |
-| `start_verification` | Start the paid workflow only with explicit authorization and idempotency key |
-| `get_verification_status` | Read attempts, unique Miners, normalized outcomes, and remaining requirements |
-| `prepare_settlement` | Return settlement state; authority exists only after deterministic `RELEASE` |
-| `get_receipt` | Fetch the immutable decision and settlement evidence |
-| `replay_receipt` | Recompute hashes and policy without routing, paying, signing, or executing |
+```bash
+npm run mcp
+```
 
-## Non-negotiable safety requirements
+Verify the MCP handshake, tool discovery, and a read-only call with:
 
-- Never expose payer or authorizer private keys through tool input, output, logs, resources, or prompts.
-- Funding returns wallet-ready transaction data unless the caller possesses an explicitly delegated, bounded wallet capability.
-- Deterministic policy remains the only path to settlement authority.
-- Every mutation requires a caller-scoped idempotency key.
-- Paid verification exposes the maximum cost before authorization.
-- Authorization is scoped to pact, action, recipient, amount, chain, contract, nonce, deadline, policy version, and receipt hash.
-- Read and write tools are separately authorized; a read-capable agent cannot spend or settle.
-- MCP errors preserve stable machine-readable codes without leaking secrets or raw provider credentials.
-- Replays are side-effect free by construction.
+```bash
+npm run verify:mcp
+```
 
-## Demonstration
+Example client configuration:
 
-An external coding agent reads the Secure Delivery requirements, submits its new commit and deployment through MCP, polls verification, receives a structured remediation requirement, submits the corrected artifact, and observes the final receipt. Funding remains a visible wallet decision unless a deliberately bounded delegation is configured.
+```json
+{
+  "mcpServers": {
+    "proofpact": {
+      "command": "node",
+      "args": [
+        "--conditions=react-server",
+        "--env-file=/absolute/path/to/proofpact/.env.local",
+        "--import",
+        "tsx",
+        "/absolute/path/to/proofpact/mcp/server.ts"
+      ],
+      "cwd": "/absolute/path/to/proofpact"
+    }
+  }
+}
+```
+
+## Safety properties
+
+- Payer, authorizer, deployer, and user private keys are never tool inputs or outputs.
+- Draft creation requires a caller-provided idempotency key.
+- Funding returns two wallet-ready transactions and identifies the required requester wallet.
+- Verification estimation and authorization preparation do not make a Telegraph request.
+- The authorization message is bound to one pact, submission, artifact hash, intent set, nonce, deadline, chain, and fixed `0.12 USDC` ceiling.
+- Receipt replay is side-effect free and separately reports routing, payment, signing, and execution as `false`.
+- Settlement evidence comes from the append-only confirmed-event ledger; the immutable decision receipt is not rewritten.
+
+## Production extension
+
+The local stdio server is sufficient for an external desktop or IDE agent demonstration. A hosted multi-tenant service should add authenticated Streamable HTTP transport, caller-scoped read/write capabilities, rate limits, and durable async verification jobs before exposing mutation or paid-execution tools remotely.

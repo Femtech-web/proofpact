@@ -92,7 +92,9 @@ Before each ProofRoute module is ported, its dependencies and invariants are ext
 
 ## Persistence model
 
-The first durable schema requires `policy_packs`, `policy_pack_versions`, `pacts`, `milestones`, `submissions`, `verification_runs`, `miner_signals`, `settlement_decisions`, `authorizations`, and `receipts`. Signals are append-only. A pact freezes its pack version at funding; a decision references that version and an exact ordered list of accepted signal hashes.
+The live Supabase schema stores `pacts`, `pact_submissions`, `verification_runs`, `verification_signals`, `settlement_decisions`, and `pact_receipts`, alongside the paid-attempt and reconciliation event ledger. Evidence, verification results, decisions, and receipts are append-only at the database layer. Pact state is mutable only as the workflow advances. Each pact freezes its policy identifier and version; each receipt binds the submission artifact, accepted signals, decision, and canonical payload.
+
+Settlement execution is recorded as a separate append-only event rather than mutating the decision receipt. This preserves the original decision artifact while still binding a later Base transaction to it.
 
 ## Non-negotiable invariants
 
@@ -100,7 +102,7 @@ The first durable schema requires `policy_packs`, `policy_pack_versions`, `pacts
 - One Miner identity can count at most once in a verification set.
 - Missing, malformed, stale, or inconclusive evidence never becomes an implicit pass.
 - Retries stop at explicit per-intent attempt and total-USDC limits.
-- Post-authorization ambiguity never retries; only an explicit recognized unsuccessful settlement may retry.
+- Post-authorization ambiguity may retry only after the signed authorization expires and an onchain scan proves that the exact USDC transfer did not settle.
 - Authorized spend and reported settled spend are accounted independently.
 - Paid duplicate Miner routes are persisted and charged but never satisfy independence.
 - Replays never route, pay, sign, or execute.

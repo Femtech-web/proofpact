@@ -16,6 +16,8 @@ export type LiveFraudVerifierOptions = Readonly<{
   requiredDistinctResults: number;
   attemptStore: VerificationAttemptStore;
   authorizePayment: (payment: AuthorizedPayment) => boolean | Promise<boolean>;
+  reconcileAuthorizedFailure?: Parameters<typeof runPaidFraudVerification>[0]["reconcileAuthorizedFailure"];
+  retryDelayMs?: Parameters<typeof runPaidFraudVerification>[0]["retryDelayMs"];
   fetchImpl?: typeof fetch;
 }>;
 
@@ -30,6 +32,10 @@ export function createLiveFraudVerifier(options: LiveFraudVerifierOptions) {
         maxAuthorizedCostUsdc: options.maxAuthorizedCostUsdc,
         attemptStore: options.attemptStore,
         authorizePayment: options.authorizePayment,
+        ...(options.reconcileAuthorizedFailure
+          ? { reconcileAuthorizedFailure: options.reconcileAuthorizedFailure }
+          : {}),
+        ...(options.retryDelayMs ? { retryDelayMs: options.retryDelayMs } : {}),
         attempt: async ({ attemptNumber, authorizePayment }) => {
           const paidFetch = createAuthorizedX402Fetch({
             privateKey: options.payerPrivateKey,

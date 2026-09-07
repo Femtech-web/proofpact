@@ -1,6 +1,9 @@
 import type { JsonValue } from "@/shared/json/canonical-json";
 import { sha256Hex } from "@/shared/json/canonical-json";
 import type { TelegraphEngineResult } from "@/infrastructure/telegraph/engine-client";
+import type { MinerSignalMapping } from "@/infrastructure/telegraph/miner-signal-map";
+import { normalizeRoutedResult, type NormalizedRoutedResult } from "./routed-result-normalizer";
+import { captureResponseEvidence, type ResponseEvidence } from "./response-evidence";
 
 const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
 const COMMIT = /^[0-9a-fA-F]{7,64}$/;
@@ -28,6 +31,7 @@ export type FraudVerificationRecord = Readonly<{
   confidence: number;
   signalHash: `0x${string}`;
   rawResponseHash: `0x${string}`;
+  responseEvidence: ResponseEvidence;
   costUsd: number;
   durationMs: number;
   observedAt: string;
@@ -60,33 +64,6 @@ function validateInput(input: SecureDeliveryFraudInput): SecureDeliveryFraudInpu
   });
 }
 
-function record(value: unknown): Record<string, unknown> | undefined {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
-  return value as Record<string, unknown>;
-}
-
-function normalizeFraudResult(result: JsonValue): { verdict: FraudVerificationRecord["verdict"]; confidence: number } {
-  const outer = record(result);
-  const payload = record(outer?.signal) ?? outer;
-  if (!payload) return { verdict: "INCONCLUSIVE", confidence: 0 };
-
-  const confidence = typeof payload.confidence === "number"
-    && Number.isFinite(payload.confidence)
-    && payload.confidence >= 0
-    && payload.confidence <= 1
-    ? payload.confidence
-    : 0;
-  const rawVerdict = payload.verdict ?? payload.gate_decision ?? payload.risk_level;
-  if (typeof payload.fraudulent === "boolean") {
-    return { verdict: payload.fraudulent ? "FAIL" : "PASS", confidence };
-  }
-  if (typeof rawVerdict !== "string") return { verdict: "INCONCLUSIVE", confidence };
-  const verdict = rawVerdict.trim().toUpperCase();
-  if (["ALLOW", "PASS", "SAFE", "BENIGN", "LEGITIMATE", "LOW"].includes(verdict)) return { verdict: "PASS", confidence };
-  if (["BLOCK", "FAIL", "FRAUD", "FRAUDULENT", "MALICIOUS", "HIGH", "CRITICAL"].includes(verdict)) return { verdict: "FAIL", confidence };
-  return { verdict: "INCONCLUSIVE", confidence };
-}
-
 export function buildFraudQuestion(input: SecureDeliveryFraudInput): {
   readonly query: string;
   readonly context: JsonValue;
@@ -101,7 +78,17 @@ export function buildFraudQuestion(input: SecureDeliveryFraudInput): {
   };
   const artifactHash = sha256Hex(artifact);
   return Object.freeze({
-    query: "FRAUD_DETECTION: Assess whether this secure-software-delivery pact, counterparty, payment context, and submitted evidence show fraud, impersonation, fabricated delivery, manipulated evidence, or other material deception. Return a structured verdict and confidence. Abstain when evidence is insufficient.",
+    query: [
+      "FRAUD_DETECTION: Assess this secure-software-delivery claim for fraud, impersonation, fabricated delivery, manipulated evidence, or material deception.",
+      `Repository: ${value.repositoryUrl}`,
+      `Commit: ${value.commitSha}`,
+      `Deployment: ${value.deploymentUrl}`,
+      `Worker claim: ${value.claimedRemediation}`,
+      `Requester: ${value.requesterAddress.toLowerCase()}`,
+      `Worker: ${value.workerAddress.toLowerCase()}`,
+      `Reward: ${value.rewardUsdc} USDC`,
+      "Return JSON with verdict PASS, FAIL, or INCONCLUSIVE; confidence from 0 to 1; and a concise evidence-based reason. Use INCONCLUSIVE when the supplied evidence cannot support a decision.",
+    ].join("\n"),
     context: {
       pact_id: value.pactId,
       requester_address: value.requesterAddress.toLowerCase(),
@@ -121,11 +108,13 @@ export function toFraudVerificationRecord(
   request: ReturnType<typeof buildFraudQuestion>,
   result: TelegraphEngineResult,
   attemptNumber = 1,
+  mapping?: MinerSignalMapping,
+  normalizedResult?: NormalizedRoutedResult,
 ): FraudVerificationRecord {
   if (!Number.isSafeInteger(attemptNumber) || attemptNumber < 1 || attemptNumber > 3) {
     throw new TypeError("attemptNumber must be between 1 and 3");
   }
-  const normalized = normalizeFraudResult(result.result);
+  const normalized = normalizedResult ?? normalizeRoutedResult("FRAUD_DETECTION", result.result, mapping);
   return Object.freeze({
     pactId: input.pactId.trim(),
     attemptNumber,
@@ -138,11 +127,12 @@ export function toFraudVerificationRecord(
     confidence: normalized.confidence,
     signalHash: result.signalHash,
     rawResponseHash: result.rawResponseHash,
+    responseEvidence: captureResponseEvidence(result.result),
     costUsd: result.costUsd,
     durationMs: result.durationMs,
     observedAt: result.timestamp,
     ...(result.paymentReceipt?.transaction ? { paymentReference: result.paymentReceipt.transaction } : {}),
     ...(result.paymentReceipt ? { paymentResponseHash: result.paymentReceipt.headerHash } : {}),
-    warnings: result.warnings,
+    warnings: Object.freeze([...result.warnings, `NORMALIZATION_${normalized.normalization}`]),
   });
 }

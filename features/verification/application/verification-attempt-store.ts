@@ -42,6 +42,12 @@ export type VerificationAttemptEvent =
       paymentState: "NOT_AUTHORIZED" | "EXPLICITLY_UNSETTLED" | "AUTHORIZED_AMBIGUOUS";
       retryable: boolean;
       diagnostic?: Readonly<Record<string, string | number | boolean>>;
+    }>)
+  | (AttemptEventBase & Readonly<{
+      type: "PAYMENT_RECONCILED";
+      reconciliationState: "EXPIRED_UNSETTLED" | "SETTLED" | "UNKNOWN";
+      retryPermitted: boolean;
+      evidence: Readonly<Record<string, string | number | boolean>>;
     }>);
 
 export interface VerificationAttemptStore {

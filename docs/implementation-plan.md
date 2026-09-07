@@ -17,48 +17,55 @@
 - [x] Keep the live verifier behind a server-only composition boundary.
 - [x] Add bounded retry and whole-workflow cost accounting without retrying ambiguous paid failures.
 - [x] Add CVE, URL, and SSL question builders, strict response normalizers, and server-only adapters.
+- [x] Put exact artifact coordinates in every Miner question, consume declared Miner mappings, add a fenced optional prose translator, and persist bounded redacted response evidence.
 - [x] Add append-only PostgreSQL persistence for every route attempt, including failed and duplicate routes.
 - [x] Test pre-authorization transport retry, ambiguous paid failure, explicit unsettled failure, wrong intent, wrong network/token, excessive price, duplicate Miner, malformed answer, and cumulative cost ceilings.
-- [ ] Apply the attempt-ledger migration to a configured PostgreSQL database and make one authorized live fraud run.
+- [x] Apply the attempt ledger to Supabase and prove live paid fraud, URL, and SSL routing with fail-closed receipts.
 
 ## Phase 2 — durable pacts
 
-- Add PostgreSQL persistence and migrations.
-- Persist immutable policy-pack versions and bind each funded pact to one version.
-- Implement requester and worker identity/authentication.
-- Add Server Actions for pact creation and submission.
+- [x] Add PostgreSQL persistence and migrations.
+- [x] Persist immutable policy-pack versions and bind each funded pact to one version.
+- [x] Implement requester and worker wallet signatures and role gates.
+- [x] Add Server Actions for pact creation, funding reconciliation, submission, and requester verification authorization.
+- [x] Recover long verification responses through independent receipt/status polling, including after a page refresh.
 - Verify GitHub webhooks and bind commits/deployments to submissions.
-- Make jobs and receipts shareable by stable identifiers.
+- [x] Make jobs and receipts shareable by stable identifiers.
+- [x] Make `HELD` actionable with receipt review, worker remediation handoff, and identical-artifact rejection.
 
 ## Phase 3 — onchain settlement
 
-- Implement and test the Base escrow contract.
-- Port ProofRoute EIP-712 authorization and replay protection.
-- Bind policy version, receipt hash, job, recipient, amount, nonce, deadline, chain, and contract into the signature.
-- Deploy and verify on Base Sepolia; record deployment evidence.
+- [x] Implement and adversarially test the Base escrow contract.
+- [x] Port ProofRoute EIP-712 authorization and replay protection.
+- [x] Bind policy version, receipt hash, job, recipient, amount, nonce, deadline, chain, and contract into the signature.
+- [x] Deploy and verify on Base Sepolia; record deployment evidence.
+- [x] Prove one live receipt-bound release transaction.
 
 ## Phase 4 — complete product loop
 
-- Orchestrate paid multi-intent verification with bounded concurrency.
-- Add remediation/reverification and milestone holdbacks.
-- Make Secure Delivery the production-ready launch pack; keep other packs explicitly preview until their evidence schemas and test corpora pass release gates.
+- [x] Orchestrate paid multi-intent verification with bounded retries, global cost limits, ambiguous-payment reconciliation, and Miner deduplication.
+- [x] Add remediation and fresh worker submissions.
+- [ ] Move execution itself behind a durable asynchronous job boundary; persisted browser progress polling is implemented, but the initiating Server Action still owns the worker process.
+- [ ] Add milestone holdbacks.
+- [x] Give all seven packs typed evidence schemas, live request builders, mandatory fraud coverage, artifact commitments, and policy tests; distinguish supported packs from Secure Delivery's deeper paid proof.
 - Render real Miner identities, costs, answers, and signal hashes.
 - Add scheduled post-deployment checks without implying clawback.
 - Complete accessibility, responsive, empty, loading, degraded, and failure states.
 
 ## Phase 5 — prove the end-to-end path
 
-- Run the full unsafe → hold → patch → release demo.
-- Publish replay instructions, test matrix, receipts, payment references, and Base transactions.
-- Treat this live proof as the release gate for beginning MCP work.
+- [x] Run the full unsafe → hold → patch → release demo.
+- [x] Publish replay instructions, test matrix, receipts, payment references, and Base transactions.
+- [x] Treat this live proof as the release gate for beginning MCP work.
 
 ## Phase 6 — MCP adapter
 
-- Expose the existing application use cases through a Streamable HTTP MCP server.
-- Add read/write scope separation, caller authentication, idempotency keys, and stable errors.
-- Return wallet-ready funding data by default; never expose payer or authorizer keys.
-- Require cost disclosure and explicit authorization before paid verification.
-- Verify that MCP and web paths produce identical policy decisions and receipt hashes.
+- [x] Expose safe existing application use cases through a local stdio MCP server.
+- [x] Require idempotency keys for draft mutation and keep transaction/signature operations preparatory.
+- [x] Return wallet-ready funding data by default; never expose payer or authorizer keys.
+- [x] Require cost disclosure and explicit authorization preparation before paid verification.
+- [x] Reuse the same policy, funding, authorization, persistence, and receipt hashing services as the web path.
+- [ ] Add authenticated Streamable HTTP transport and caller scopes before remote multi-tenant use.
 
 ## Phase 7 — external-agent proof and launch
 
@@ -73,4 +80,4 @@
 
 ## Immediate next action
 
-Complete Phase 1’s live proof: apply the PostgreSQL attempt-ledger migration, compose the live fraud verifier with the durable store, and make one explicitly authorized routed request. Then begin Phase 2 pact/submission persistence. Do not begin the MCP server until Phases 1–5 prove the browser flow with real x402 and Base Sepolia evidence.
+Deploy the web application, configure its public URL, and run production smoke checks. The end-to-end Base flow and thin local MCP adapter are complete. Before production scale, move long verification behind a durable asynchronous job boundary and add authenticated Streamable HTTP MCP transport; neither is required to demonstrate the proven hackathon flow.

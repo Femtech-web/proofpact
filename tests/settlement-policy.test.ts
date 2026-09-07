@@ -11,7 +11,6 @@ function signal(intent: VerificationSignal["intent"], minerId: string, verdict: 
 test("releases only when every core intent, including FRAUD_DETECTION, passes", () => {
   const result = evaluateSettlement([
     signal("FRAUD_DETECTION", "miner-a"),
-    signal("CVE_LOOKUP", "miner-b"),
     signal("URL_SCAN", "miner-c"),
     signal("SSL_VERIFICATION", "miner-d"),
   ]);
@@ -20,7 +19,6 @@ test("releases only when every core intent, including FRAUD_DETECTION, passes", 
 
 test("retries when fraud intelligence is absent", () => {
   const result = evaluateSettlement([
-    signal("CVE_LOOKUP", "miner-b"),
     signal("URL_SCAN", "miner-c"),
     signal("SSL_VERIFICATION", "miner-d"),
   ]);
@@ -33,15 +31,24 @@ test("rejects a conclusive fraud failure", () => {
   assert.equal(result.decision, "REJECT");
 });
 
-test("does not count duplicate Miner identities twice", () => {
+test("allows one Miner to satisfy different intents when the run has independent providers overall", () => {
   const result = evaluateSettlement([
     signal("FRAUD_DETECTION", "miner-a"),
-    signal("CVE_LOOKUP", "MINER-A"),
     signal("URL_SCAN", "miner-c"),
     signal("SSL_VERIFICATION", "miner-d"),
   ]);
+  assert.equal(result.decision, "RELEASE");
+  assert.deepEqual(result.missingIntents, []);
+});
+
+test("requires at least two Miner identities across the complete result", () => {
+  const result = evaluateSettlement([
+    signal("FRAUD_DETECTION", "miner-a"),
+    signal("URL_SCAN", "miner-a"),
+    signal("SSL_VERIFICATION", "miner-a"),
+  ]);
   assert.equal(result.decision, "RETRY");
-  assert.deepEqual(result.missingIntents, ["CVE_LOOKUP"]);
+  assert.deepEqual(result.missingIntents, ["INDEPENDENT_MINER"]);
 });
 
 test("every policy pack requires fraud intelligence", () => {

@@ -59,14 +59,14 @@ Agents can already write code, research, transform data, publish content, operat
 
 Today the answer is usually the worker, one centralized API, a marketplace operator, or a human reviewer. That does not scale to an autonomous economy. ProofPact converts completion into explicit claims, purchases independent evidence for those claims, and gives that evidence a deterministic financial consequence.
 
-## The launch product
+## The first proven workflow
 
 The pack we will prove deeply first is **Secure Delivery**: pay a worker to remediate a vulnerability and deploy the corrected service.
 
-1. The requester chooses Secure Delivery, defines the CVE and acceptance criteria, and locks USDC on Base.
+1. The requester chooses Secure Delivery, defines the acceptance criteria, and locks USDC on Base.
 2. The worker or coding agent patches the repository and deploys it through its existing GitHub/Vercel workflow.
 3. The worker submits the commit, deployment URL, and evidence to ProofPact.
-4. ProofPact pays real Telegraph routes for `FRAUD_DETECTION`, `CVE_LOOKUP`, `URL_SCAN`, and `SSL_VERIFICATION`.
+4. ProofPact verifies the exact public GitHub commit directly and binds its response hash into the receipt. The requester can then request written changes for free, or sign a short-lived verification authorization capped at `0.12 USDC`. ProofPact pays real Telegraph routes for `FRAUD_DETECTION`, `URL_SCAN`, and `SSL_VERIFICATION`. The milestone reward remains locked.
 5. Duplicate Miner identities are refused; missing, stale, low-confidence, or malformed results cannot pass.
 6. Deterministic policy returns `RELEASE`, `RETRY`, `HOLD`, or `REJECT`.
 7. A failed delivery remains locked and enters remediation. A passing delivery creates bounded EIP-712 authority to release the escrow.
@@ -84,15 +84,29 @@ A policy pack is a versioned acceptance program—not a visual template. It defi
 
 | Pack | Outcome being purchased | Required intelligence | Product status |
 | --- | --- | --- | --- |
-| Secure Delivery | A vulnerability is fixed and safely deployed | Fraud, CVE, URL, SSL | Launch pack |
-| Research | A sourced brief answers the commissioned question | Fraud, fact, task | Preview |
-| Data Work | A dataset or transformation meets an agreed quality bar | Fraud, fact, task | Preview |
-| Content | Factual, original, compliant content is delivered | Fraud, fact, task | Preview |
-| Growth | A campaign delivered authentic agreed outcomes | Fraud, fact, URL | Preview |
-| Protocol Operations | An operational or treasury change was safely completed | Fraud, CVE, URL, SSL | Preview |
-| Agent Services | One agent completed a machine-readable service for another | Fraud, fact, task | Preview |
+| Secure Delivery | A vulnerability is fixed and safely deployed | Direct source proof + fraud, URL, SSL | Supported · live demo path |
+| Research | A sourced brief answers the commissioned question | Fraud, fact, task | Supported |
+| Data Work | A dataset or transformation meets an agreed quality bar | Fraud, fact, task | Supported |
+| Content | Factual, original, compliant content is delivered | Fraud, fact, task | Supported |
+| Growth | A campaign delivered authentic agreed outcomes | Fraud, fact, URL | Supported |
+| Protocol Operations | An operational or treasury change was safely completed | Fraud, fact, URL, SSL | Supported |
+| Agent Services | One agent completed a machine-readable service for another | Fraud, fact, task | Supported |
 
-Every pack requires `FRAUD_DETECTION`. Preview packs remain preview until their live Miner coverage, evidence schemas, adversarial corpus, and first design-partner pact pass release gates.
+Every pack now has a strict public-evidence schema, artifact commitment, live Telegraph request adapters, deterministic settlement requirements, and positive/negative policy tests. Every pack requires `FRAUD_DETECTION`. Secure Delivery remains the recorded end-to-end demonstration; the other packs are supported but are not falsely presented as having completed their own paid design-partner runs.
+
+## What the states mean
+
+Think of the escrow as a locked envelope:
+
+- `FUNDED`: the requester put money in the envelope.
+- `SUBMITTED`: the worker put proof of the work beside it.
+- `VERIFYING`: ProofPact is paying independent Telegraph inspectors to check that proof.
+- `RETRY`: an inspector response was missing or unclear. This is not a worker failure; the requester may check the same proof again.
+- `HOLD`: a conclusive check found a problem, or the requester asked for changes. The worker must submit changed evidence.
+- `APPROVED`: every required check passed. The money is still locked until the Base release transaction confirms.
+- `RELEASED`: Base transferred the exact reward to the recorded worker.
+
+The receipt page is a permanent report, not the current pact page. An older receipt can still say `RETRY` after a later run succeeds; return to the pact to see the current lifecycle state and newest receipt.
 
 ## Why Telegraph is indispensable
 
@@ -114,16 +128,16 @@ One job may fund the initial verification set, bounded retries, a fresh set afte
 
 - **The verification has authority.** Telegraph evidence controls settlement rather than decorating a dashboard.
 - **Failure is a product path.** Unsafe work is held, explained, remediated, and freshly verified.
-- **Independence is enforced.** One Miner identity cannot satisfy several apparently independent requirements.
+- **Independence is enforced.** Duplicate routes from one Miner cannot count twice for the same intent, and release requires at least two distinct Miner identities overall.
 - **Decisions are replayable.** Replaying a receipt performs no network call, payment, signature, or execution.
 - **Acceptance is frozen before work.** The funded pact commits to an immutable policy-pack version.
 - **The wedge can expand.** New packs create new Telegraph demand without inventing another custody protocol.
 
 ## MCP: the agent-native interface
 
-After the Secure Delivery flow works end to end and is proven with real Telegraph payments and Base settlement, ProofPact will expose the same application use cases through an MCP server. That lets Codex, Claude, ChatGPT, IDE agents, and autonomous systems create or inspect pacts without creating a second implementation.
+ProofPact now exposes a thin local stdio MCP server over the same policy, persistence, funding, authorization, and receipt services used by the web application. Codex, Claude, ChatGPT, IDE agents, and autonomous systems can list policy packs, idempotently create drafts, inspect pacts, prepare wallet-ready funding, prepare worker/requester signature messages, estimate bounded Telegraph cost, and replay receipts.
 
-The MCP is deliberately sequenced after the core flow. Its non-negotiable controls are documented in [MCP integration](docs/mcp-integration.md): no exposed payer/authorizer keys, wallet-ready funding by default, deterministic settlement gating, idempotent mutations, pre-payment cost estimates, and tightly scoped authorizations.
+The MCP never accepts or returns private keys, never broadcasts wallet transactions, and never begins paid verification merely because an agent requested an estimate or signing payload. Its controls, tool list, and client configuration are documented in [MCP integration](docs/mcp-integration.md).
 
 ## Architecture
 
@@ -150,21 +164,25 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for boundaries and invariants.
 
 | Capability | Current evidence |
 | --- | --- |
-| Policy-pack domain model | Implemented and typechecked |
+| Policy-pack domain model | Seven strict evidence schemas, request adapters, artifact commitments, and settlement-policy suites implemented and typechecked |
 | Universal `FRAUD_DETECTION` requirement | Implemented and tested across every pack |
 | Deterministic four-outcome policy | Implemented and tested |
 | Miner identity deduplication | Implemented and tested |
-| Marketing and workspace routes | Production Next.js build passes |
+| Database-backed workspace routes | Real pact list, idempotent draft creation, pact details, immutable receipt reads, and explicit offchain/onchain state separation; production build and live route smoke pass |
 | Base Sepolia USDC x402 challenge gate | Ported and tested against mocked protocol responses |
-| `FRAUD_DETECTION` request/response kernel | Artifact-bound builder, strict Engine validation, provenance record, and fail-closed normalizer implemented |
-| Paid retry and cost boundary | Three-attempt maximum, separate authorized/settled accounting, and no ambiguous post-authorization retry; tested locally |
-| CVE, URL, and SSL adapters | Artifact-bound questions and strict structured normalizers implemented; live routing not yet claimed |
-| Attempt ledger | Append-only application events and PostgreSQL adapter/migration implemented; migration not yet applied to a live database |
-| Live paid Telegraph evidence | Not yet claimed; no paid call was made during this implementation slice |
-| Durable pact persistence | Planned next |
-| ProofPact escrow and EIP-712 settlement | Planned after verification kernel |
-| End-to-end Base Sepolia demo | Not yet claimed |
-| MCP server | Deliberately scheduled after live end-to-end proof |
+| `FRAUD_DETECTION` request/response kernel | Artifact-bound builder, strict Engine validation, live declared-schema mapping, optional fenced prose translation, bounded response evidence, and fail-closed normalization implemented |
+| Paid retry and cost boundary | Three-attempt maximum, managed DNS transport plus bounded backoff before authorization, separate authorized/settled accounting, and retry after ambiguous authorization only when expiry plus onchain evidence proves it unpaid; tested locally and against live transport failures |
+| Source, URL, and SSL adapters | Exact GitHub provenance, artifact-bound Miner questions, declared-schema adapters, optional fenced prose translation, bounded response evidence, and live paid routing proven |
+| Attempt ledger | Append-only application events, reconciliation events, and both PostgreSQL migrations are applied to Supabase |
+| Live paid Telegraph evidence | Multiple bounded operations are recorded. Receipt `4fed2dbe-bbee-417c-a636-a2863d50affa` proved fraud and URL passes plus fail-closed handling of an in-progress SSL check. Receipt `a7245f3a-1934-481c-85c8-2be78b2f3f66` proved fraud plus SSL `A+` passes and safely retried an upstream URL acquisition failure. Fresh exact-artifact evidence then produced `RELEASE` receipt `afaf9ddb-a1a7-4c2d-b37a-5756dcfee984` without paying twice. |
+| Durable pact persistence | Pact, submission, run, signal, decision, and immutable receipt tables applied to Supabase; idempotency smoke verified through the production adapter |
+| ProofPact escrow and EIP-712 settlement | Deployed and independently read back on Base Sepolia at `0xda056735D5B5D4253a8c8E9B5d9AC73285F27314`; exact-USDC custody, receipt-bound release/refund permits, wallet-ready transaction adapter, and adversarial Foundry suite are implemented |
+| Pact funding | Drafts now produce exact-amount USDC approval and immutable `fundPact` wallet transactions; the server advances to `FUNDED` only after matching the confirmed Base event to every persisted pact term |
+| Worker delivery | A funded or remediation-held pact accepts evidence only after a time-bounded signature from its recorded worker; the signature binds repository, commit, deployment, claim, pact, nonce, and chain context but grants no settlement authority |
+| Requester revision path | Signed, written, immutable change requests implemented; no Telegraph payment is made before the worker resubmits |
+| Receipt-bound release interface | Implemented: the server signs a narrowly bounded EIP-712 permit, the requester submits it from the selected wallet, and ProofPact records `RELEASED` only after matching the Base event |
+| End-to-end Base Sepolia demo | Complete: funded, worker-signed submission, paid verification, fail-closed retry, remediation, three-Miner `RELEASE` receipt, requester-submitted Base release, and independently matched `RELEASED` state |
+| MCP server | Nine-tool local stdio adapter implemented over the proven services; read, draft, transaction-preparation, authorization-preparation, and side-effect-free receipt replay are covered |
 
 This honesty boundary is intentional: architecture tests are not represented as live protocol evidence.
 
@@ -174,6 +192,7 @@ This honesty boundary is intentional: architecture tests are not represented as 
 cp .env.example .env.local
 npm install
 npm run verify
+npm run verify:mcp
 ```
 
 `verify` runs strict TypeScript checking, the policy tests, and a production Next.js build.
@@ -191,3 +210,4 @@ npm run verify
 - [Judge demo](docs/demo-scenario.md)
 - [Competitive position](docs/competitive-positioning.md)
 - [Testing and evidence](docs/testing-and-evidence.md)
+- [Submission copy](docs/submission-copy.md)

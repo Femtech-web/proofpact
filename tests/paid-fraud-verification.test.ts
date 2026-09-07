@@ -38,6 +38,7 @@ function routed(attemptNumber: number, minerId: string, minerName = `miner-${min
     confidence: 0.92,
     signalHash: `0x${attemptNumber.toString(16).repeat(64).slice(0, 64)}`,
     rawResponseHash: `0x${"4".repeat(64)}`,
+    responseEvidence: { status: "CAPTURED", byteLength: 18, value: { verdict: "PASS" } },
     costUsd: 0.01,
     durationMs: 100,
     observedAt: "2026-09-04T12:00:00.000Z",
@@ -52,6 +53,7 @@ function stableIds() {
 
 test("retries bounded pre-authorization transport errors and persists every attempt", async () => {
   const store = createInMemoryVerificationAttemptStore();
+  const delays: number[] = [];
   const result = await runPaidFraudVerification({
     runId: "run-pre-auth",
     input,
@@ -60,6 +62,8 @@ test("retries bounded pre-authorization transport errors and persists every atte
     maxAuthorizedCostUsdc: 0.03,
     attemptStore: store,
     authorizePayment: () => true,
+    retryDelayMs: ({ attemptNumber }) => attemptNumber * 10,
+    sleep: async (milliseconds) => { delays.push(milliseconds); },
     createEventId: stableIds(),
     attempt: async ({ attemptNumber, authorizePayment }) => {
       if (attemptNumber === 1) throw new TelegraphEngineError("TRANSPORT_ERROR", "offline");
@@ -70,6 +74,7 @@ test("retries bounded pre-authorization transport errors and persists every atte
   assert.equal(result.complete, true);
   assert.equal(result.attempts, 2);
   assert.equal(result.authorizedCostUsdc, 0.01);
+  assert.deepEqual(delays, [10]);
   assert.deepEqual(store.events.map((event) => event.type), ["STARTED", "FAILED", "STARTED", "PAYMENT_AUTHORIZED", "SUCCEEDED"]);
 });
 
@@ -95,6 +100,73 @@ test("never retries an ambiguous error after payment authorization", async () =>
   const failed = store.events.find((event) => event.type === "FAILED");
   assert.equal(failed?.type === "FAILED" && failed.paymentState, "AUTHORIZED_AMBIGUOUS");
   assert.equal(failed?.type === "FAILED" && failed.retryable, false);
+});
+
+test("retries an ambiguous authorization only after reconciliation proves it expired unsettled", async () => {
+  const store = createInMemoryVerificationAttemptStore();
+  let attempts = 0;
+  const result = await runPaidFraudVerification({
+    runId: "run-reconciled-unsettled",
+    input,
+    maxAttempts: 3,
+    requiredDistinctResults: 1,
+    maxAuthorizedCostUsdc: 0.03,
+    attemptStore: store,
+    authorizePayment: () => true,
+    reconcileAuthorizedFailure: async ({ attemptNumber }) => ({
+      state: "EXPIRED_UNSETTLED",
+      evidence: { checkedThroughBlock: 1234, attemptNumber },
+    }),
+    createEventId: stableIds(),
+    attempt: async ({ attemptNumber, authorizePayment }) => {
+      attempts += 1;
+      assert.equal(await authorizePayment(payment), true);
+      if (attemptNumber === 1) throw new TelegraphEngineError("TRANSPORT_ERROR", "response lost");
+      return routed(attemptNumber, "84");
+    },
+  });
+  assert.equal(result.complete, true);
+  assert.equal(attempts, 2);
+  assert.equal(result.authorizedCostUsdc, 0.02);
+  assert.deepEqual(store.events.map((event) => event.type), [
+    "STARTED",
+    "PAYMENT_AUTHORIZED",
+    "FAILED",
+    "PAYMENT_RECONCILED",
+    "STARTED",
+    "PAYMENT_AUTHORIZED",
+    "SUCCEEDED",
+  ]);
+  const reconciliation = store.events.find((event) => event.type === "PAYMENT_RECONCILED");
+  assert.equal(reconciliation?.type === "PAYMENT_RECONCILED" && reconciliation.retryPermitted, true);
+});
+
+test("does not retry when reconciliation finds settlement", async () => {
+  const store = createInMemoryVerificationAttemptStore();
+  let attempts = 0;
+  await assert.rejects(() => runPaidFraudVerification({
+    runId: "run-reconciled-settled",
+    input,
+    maxAttempts: 3,
+    requiredDistinctResults: 1,
+    maxAuthorizedCostUsdc: 0.03,
+    attemptStore: store,
+    authorizePayment: () => true,
+    reconcileAuthorizedFailure: async () => ({
+      state: "SETTLED",
+      evidence: { transactionHash: `0x${"a".repeat(64)}` },
+    }),
+    createEventId: stableIds(),
+    attempt: async ({ authorizePayment }) => {
+      attempts += 1;
+      assert.equal(await authorizePayment(payment), true);
+      throw new TelegraphEngineError("TRANSPORT_ERROR", "response lost");
+    },
+  }), /response lost/);
+  assert.equal(attempts, 1);
+  const reconciliation = store.events.find((event) => event.type === "PAYMENT_RECONCILED");
+  assert.equal(reconciliation?.type === "PAYMENT_RECONCILED" && reconciliation.reconciliationState, "SETTLED");
+  assert.equal(reconciliation?.type === "PAYMENT_RECONCILED" && reconciliation.retryPermitted, false);
 });
 
 test("retries only an explicitly unsuccessful settlement and accounts for later authority", async () => {

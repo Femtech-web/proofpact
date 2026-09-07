@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Mono, Instrument_Serif } from "next/font/google";
+import "@rainbow-me/rainbowkit/styles.css";
+import { AppProviders } from "./app-providers";
 import "./globals.css";
 
 const display = Instrument_Serif({
@@ -22,7 +24,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className={`${display.variable} ${mono.variable}`}>
-      <body>{children}</body>
+      <body><AppProviders>{children}</AppProviders></body>
     </html>
   );
 }

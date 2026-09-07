@@ -18,14 +18,16 @@ const MIN_CONFIDENCE = 0.75;
 export function evaluateSettlement(
   signals: readonly VerificationSignal[],
   policyPackId: PolicyPackId = "secure-delivery",
+  requiredIntentsOverride?: readonly VerificationSignal["intent"][],
 ): SettlementResult {
   const policyPack = getPolicyPack(policyPackId);
+  const requiredIntents = requiredIntentsOverride ?? policyPack.requiredIntents;
   const uniqueSignals = uniqueMinerSignals(signals);
   const conclusive = uniqueSignals.filter(
     (signal) => signal.verdict !== "INCONCLUSIVE" && signal.confidence >= MIN_CONFIDENCE,
   );
   const satisfied = new Set(conclusive.map((signal) => signal.intent));
-  const missingIntents = policyPack.requiredIntents.filter((intent) => !satisfied.has(intent));
+  const missingIntents = requiredIntents.filter((intent) => !satisfied.has(intent));
 
   const fraudSignal = conclusive.find((signal) => signal.intent === "FRAUD_DETECTION");
   if (fraudSignal?.verdict === "FAIL") {
@@ -38,6 +40,15 @@ export function evaluateSettlement(
 
   if (missingIntents.length > 0) {
     return { decision: "RETRY", reason: "Required independent evidence is missing or inconclusive.", acceptedSignals: conclusive, missingIntents };
+  }
+
+  if (new Set(conclusive.map((signal) => signal.minerId.trim().toLowerCase())).size < 2) {
+    return {
+      decision: "RETRY",
+      reason: "Verification requires evidence from at least two independent Miner identities.",
+      acceptedSignals: conclusive,
+      missingIntents: ["INDEPENDENT_MINER"],
+    };
   }
 
   return { decision: "RELEASE", reason: "All required independent checks passed policy.", acceptedSignals: conclusive, missingIntents };
