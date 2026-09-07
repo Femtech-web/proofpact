@@ -47,7 +47,7 @@ In application-stack terms:
 | **ProofPact** | Defines acceptance, gathers evidence, buys verification, decides settlement | Policy packs, orchestration, deterministic decision, receipt |
 | Intelligence market | Supplies ranked independent answers | Telegraph and its Miners |
 | Payment/custody | Locks and moves the reward | ProofPact escrow on Base |
-| Integration surface | Lets other products and agents operate ProofPact | Web application first; MCP after the core flow is proven |
+| Integration surface | Lets humans, products, and agents operate ProofPact | Web application plus a thin local MCP adapter over the same services |
 
 ProofPact starts when a requester turns work into a funded, measurable pact. It stops after producing an auditable settlement outcome and receipt. The worker continues to work in its normal tools; Telegraph continues to own routing and Miner ranking; Base continues to own custody and execution.
 
@@ -61,7 +61,7 @@ Today the answer is usually the worker, one centralized API, a marketplace opera
 
 ## The first proven workflow
 
-The pack we will prove deeply first is **Secure Delivery**: pay a worker to remediate a vulnerability and deploy the corrected service.
+The pack proven deeply end to end is **Secure Delivery**: pay a worker to remediate a vulnerability and deploy the corrected service.
 
 1. The requester chooses Secure Delivery, defines the acceptance criteria, and locks USDC on Base.
 2. The worker or coding agent patches the repository and deploys it through its existing GitHub/Vercel workflow.
